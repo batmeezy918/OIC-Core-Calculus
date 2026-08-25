@@ -1,0 +1,10 @@
+name = "OICCore"
+version = "1.0.0"
+defaultTargets = ["oiccore"]
+
+[[lean_lib]]
+name = "OICCore"
+
+[[lean_exe]]
+name = "oiccore"
+root = "Main"
