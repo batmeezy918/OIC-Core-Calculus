@@ -1,0 +1,27 @@
+name: Lean4 Verification
+
+on:
+  push:
+    paths:
+      - "OICCore/**"
+      - "*.lean"
+      - "lakefile.toml"
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Lean 4
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:v4.29.0
+          echo "$HOME/.elan/bin" >> $GITHUB_PATH
+          source $HOME/.elan/env
+          lean --version
+
+      - name: Build OIC Core
+        run: |
+          lake build
