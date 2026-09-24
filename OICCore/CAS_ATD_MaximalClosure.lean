@@ -1,22 +1,7 @@
 /-!
 CAS / ATD v6.1
 Maximal Formal Closure Scaffold
-
-Purpose:
-  A proof-oriented Lean 4 scaffold for the CAS geometric layer sitting on top
-  of the already-established ATD/AGD quotient machinery.
-
-Kernel target:
-  Lean 4.29.0, Mathlib-free, so the existing GitHub Lean4 workflow can
-  certify the file without an external library fetch.
-
-Important epistemic boundary:
-  * The quotient theorems below are proved from their explicit hypotheses.
-  * CAS numerical telemetry is represented as evidence data, not silently
-    converted into mathematical theorems.
-  * Geometric descent, metric inversion, invariant preservation, and measured
-    performance remain explicit proof obligations.
-  * No `sorry` is used.
+Lean 4.29.0, Mathlib-free, zero sorry.
 -/
 
 namespace CAS_ATD
@@ -418,13 +403,12 @@ theorem CASMaximalClosure.scalar_factorization
 
 abbrev Operator (X : Type _) := X -> X
 
-def composeChain {X : Type _} : List (Operator X) -> Operator X
-  | []      => id
-  | o :: os => composeChain os circ o
-
--- composition helper without unicode circ token
 def composeOp {X : Type _} (g f : Operator X) : Operator X :=
   fun x => g (f x)
+
+def composeChain {X : Type _} : List (Operator X) -> Operator X
+  | []      => id
+  | o :: os => composeOp (composeChain os) o
 
 def ThreadLockOperator
     {X : Type _}
@@ -487,7 +471,7 @@ structure NumericalObservation where
   label : String
   numerator : Int
   denominator : Nat
-  denominator_pos : denominator <> 0
+  denominator_pos : Not (denominator = 0)
   note : String
 
 def casRicciTraceObservation : NumericalObservation :=
