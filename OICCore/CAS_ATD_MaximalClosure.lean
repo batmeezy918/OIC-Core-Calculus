@@ -1,6 +1,5 @@
 /-!
-CAS / ATD v6.1
-Maximal Formal Closure Scaffold
+CAS / ATD v6.1 maximal formal closure scaffold.
 Lean 4.29.0, Mathlib-free, zero sorry.
 -/
 
@@ -57,16 +56,19 @@ def AdmissibleReconstruction : Prop :=
   forall x : X, S.admissible x -> S.R (S.Q x) = S.R (S.Q (S.R (S.Q x)))
 
 def RecursiveClosure : Prop :=
-  forall (n : Nat) (x : X), S.Q ((S.T)^[n] x) = (S.Tbar)^[n] (S.Q x)
+  forall (n : Nat) (x : X),
+    S.Q (Function.iterate S.T n x) =
+      Function.iterate S.Tbar n (S.Q x)
 
 theorem recursiveClosure_of_intertwining
     (h : S.Intertwining) : S.RecursiveClosure := by
   intro n x
   induction n with
   | zero =>
-      simp
+      simp [Function.iterate]
   | succ n ih =>
-      rw [Function.iterate_succ_apply, Function.iterate_succ_apply, h, ih]
+      simp [Function.iterate_succ]
+      rw [h, ih]
 
 theorem reconstruction_is_section
     (h : S.Reconstruction) :
@@ -80,7 +82,7 @@ def FiberConstant {Z : Type _} (f : X -> Z) : Prop :=
 noncomputable def descendObservableOfSurjective
     {Z : Type _} (f : X -> Z)
     (hSurj : Function.Surjective S.Q)
-    (hf : S.FiberConstant f) : Y -> Z :=
+    (_hf : S.FiberConstant f) : Y -> Z :=
   fun y => f (Classical.choose (hSurj y))
 
 theorem descendObservable_spec
@@ -116,10 +118,8 @@ theorem residual_zero_iff_int (B : ResidualBoundary Int Y) (x : Int) :
     ResidualInt B x = 0 <-> x = B.R (B.Q x) := by
   unfold ResidualInt
   constructor
-  · intro h
-    omega
-  · intro h
-    simp [h]
+  · intro h; omega
+  · intro h; omega
 
 theorem section_is_right_inverse (y : Y) :
     B.Q (B.R y) = y :=
@@ -128,7 +128,6 @@ theorem section_is_right_inverse (y : Y) :
 end ResidualBoundary
 
 abbrev Point (n : Nat) := Fin n
-
 abbrev GeomMatrix (n : Nat) := Point n -> Point n -> Int
 
 def sumFin {n : Nat} (f : Fin n -> Int) : Int :=
@@ -143,6 +142,10 @@ structure GeometricState (n : Nat) where
   riemann       : Point n -> Point n -> Point n -> Point n -> Int
   ricci         : GeomMatrix n
   inverseMetric : GeomMatrix n
+
+def geomEta {n : Nat} (G : GeometricState n) :
+    G = GeometricState.mk G.metric G.connection G.riemann G.ricci G.inverseMetric :=
+  rfl
 
 def scalarCurvature {n : Nat} (gInv ric : GeomMatrix n) : Int :=
   sumFin2 (fun i j => gInv i j * ric i j)
@@ -383,11 +386,9 @@ theorem CASMaximalClosure.geometric_factorization
       C.geometry.ricciBar (S.Q x) = (geom x).ricci /\
       C.geometry.inverseMetricBar (S.Q x) = (geom x).inverseMetric := by
   intro x
-  exact ⟨
-    C.geometry.metric_descent x,
-    C.geometry.ricci_descent x,
-    C.geometry.inverse_metric_descent x
-  ⟩
+  exact And.intro (C.geometry.metric_descent x)
+    (And.intro (C.geometry.ricci_descent x)
+      (C.geometry.inverse_metric_descent x))
 
 theorem CASMaximalClosure.scalar_factorization
     {X Y : Type _} {n : Nat}
@@ -410,17 +411,19 @@ def composeChain {X : Type _} : List (Operator X) -> Operator X
   | []      => id
   | o :: os => composeOp (composeChain os) o
 
-def ThreadLockOperator
-    {X : Type _}
-    (isolate derive reconstruct reuse verify extract seal : Operator X) :
-    Operator X :=
+def ThreadLockOperator {X : Type _}
+    (isolate : Operator X) (derive : Operator X)
+    (reconstruct : Operator X) (reuse : Operator X)
+    (verify : Operator X) (extract : Operator X)
+    (seal : Operator X) : Operator X :=
   composeOp seal (composeOp extract (composeOp verify (composeOp reuse
     (composeOp reconstruct (composeOp derive isolate)))))
 
-theorem threadLock_form
-    {X : Type _}
-    (isolate derive reconstruct reuse verify extract seal : Operator X)
-    (psi : X) :
+theorem threadLock_form {X : Type _}
+    (isolate : Operator X) (derive : Operator X)
+    (reconstruct : Operator X) (reuse : Operator X)
+    (verify : Operator X) (extract : Operator X)
+    (seal : Operator X) (psi : X) :
     ThreadLockOperator isolate derive reconstruct reuse verify extract seal psi =
       seal (extract (verify (reuse (reconstruct
         (derive (isolate psi)))))) := by
@@ -457,15 +460,8 @@ theorem geometricDescentGap_of_components
     (inverse_h : S.FiberConstant (fun x => (geom x).inverseMetric)) :
     GeometricDescentGap S geom := by
   intro x y hxy
-  cases hx : geom x
-  cases hy : geom y
-  have hm := metric_h hxy
-  have hc := connection_h hxy
-  have hr := riemann_h hxy
-  have hrc := ricci_h hxy
-  have hi := inverse_h hxy
-  simp [hx, hy] at hm hc hr hrc hi
-  simp [hx, hy, hm, hc, hr, hrc, hi]
+  rw [geomEta (geom x), geomEta (geom y)]
+  rw [metric_h hxy, connection_h hxy, riemann_h hxy, ricci_h hxy, inverse_h hxy]
 
 structure NumericalObservation where
   label : String
@@ -497,12 +493,10 @@ theorem quotient_geometry_is_lossless_for_declared_observables
       C.geometry.scalarCurvatureBar (S.Q x) =
         scalarCurvature (geom x).inverseMetric (geom x).ricci := by
   intro x
-  exact ⟨
-    C.geometry.metric_descent x,
-    C.geometry.ricci_descent x,
-    C.geometry.inverse_metric_descent x,
-    C.geometry.scalarCurvature_descent x
-  ⟩
+  refine And.intro (C.geometry.metric_descent x) ?_
+  refine And.intro (C.geometry.ricci_descent x) ?_
+  refine And.intro (C.geometry.inverse_metric_descent x) ?_
+  exact C.geometry.scalarCurvature_descent x
 
 theorem CASMaximalClosure.recursive_from_intertwining
     {X Y : Type _} {n : Nat}
