@@ -7,6 +7,16 @@ namespace CAS_ATD
 
 universe u v
 
+def iter {alpha : Type _} (f : alpha -> alpha) : Nat -> alpha -> alpha
+  | 0, x => x
+  | Nat.succ n, x => f (iter f n x)
+
+theorem iter_zero {alpha : Type _} (f : alpha -> alpha) (x : alpha) :
+    iter f 0 x = x := rfl
+
+theorem iter_succ {alpha : Type _} (f : alpha -> alpha) (n : Nat) (x : alpha) :
+    iter f (Nat.succ n) x = f (iter f n x) := rfl
+
 inductive Evidence
   | verified
   | formallyDerived
@@ -56,19 +66,16 @@ def AdmissibleReconstruction : Prop :=
   forall x : X, S.admissible x -> S.R (S.Q x) = S.R (S.Q (S.R (S.Q x)))
 
 def RecursiveClosure : Prop :=
-  forall (n : Nat) (x : X),
-    S.Q (Function.iterate S.T n x) =
-      Function.iterate S.Tbar n (S.Q x)
+  forall (n : Nat) (x : X), S.Q (iter S.T n x) = iter S.Tbar n (S.Q x)
 
 theorem recursiveClosure_of_intertwining
     (h : S.Intertwining) : S.RecursiveClosure := by
   intro n x
   induction n with
   | zero =>
-      simp [Function.iterate]
+      rfl
   | succ n ih =>
-      simp [Function.iterate_succ]
-      rw [h, ih]
+      rw [iter_succ, iter_succ, h, ih]
 
 theorem reconstruction_is_section
     (h : S.Reconstruction) :
@@ -412,21 +419,21 @@ def composeChain {X : Type _} : List (Operator X) -> Operator X
   | o :: os => composeOp (composeChain os) o
 
 def ThreadLockOperator {X : Type _}
-    (isolate : Operator X) (derive : Operator X)
-    (reconstruct : Operator X) (reuse : Operator X)
-    (verify : Operator X) (extract : Operator X)
-    (seal : Operator X) : Operator X :=
-  composeOp seal (composeOp extract (composeOp verify (composeOp reuse
-    (composeOp reconstruct (composeOp derive isolate)))))
+    (opIsolate : Operator X) (opDerive : Operator X)
+    (opReconstruct : Operator X) (opReuse : Operator X)
+    (opVerify : Operator X) (opExtract : Operator X)
+    (opSeal : Operator X) : Operator X :=
+  composeOp opSeal (composeOp opExtract (composeOp opVerify (composeOp opReuse
+    (composeOp opReconstruct (composeOp opDerive opIsolate)))))
 
 theorem threadLock_form {X : Type _}
-    (isolate : Operator X) (derive : Operator X)
-    (reconstruct : Operator X) (reuse : Operator X)
-    (verify : Operator X) (extract : Operator X)
-    (seal : Operator X) (psi : X) :
-    ThreadLockOperator isolate derive reconstruct reuse verify extract seal psi =
-      seal (extract (verify (reuse (reconstruct
-        (derive (isolate psi)))))) := by
+    (opIsolate : Operator X) (opDerive : Operator X)
+    (opReconstruct : Operator X) (opReuse : Operator X)
+    (opVerify : Operator X) (opExtract : Operator X)
+    (opSeal : Operator X) (psi : X) :
+    ThreadLockOperator opIsolate opDerive opReconstruct opReuse opVerify opExtract opSeal psi =
+      opSeal (opExtract (opVerify (opReuse (opReconstruct
+        (opDerive (opIsolate psi)))))) := by
   rfl
 
 inductive GapStatus
@@ -460,8 +467,12 @@ theorem geometricDescentGap_of_components
     (inverse_h : S.FiberConstant (fun x => (geom x).inverseMetric)) :
     GeometricDescentGap S geom := by
   intro x y hxy
-  rw [geomEta (geom x), geomEta (geom y)]
-  rw [metric_h hxy, connection_h hxy, riemann_h hxy, ricci_h hxy, inverse_h hxy]
+  have hm : (geom x).metric = (geom y).metric := metric_h hxy
+  have hc : (geom x).connection = (geom y).connection := connection_h hxy
+  have hr : (geom x).riemann = (geom y).riemann := riemann_h hxy
+  have hrc : (geom x).ricci = (geom y).ricci := ricci_h hxy
+  have hi : (geom x).inverseMetric = (geom y).inverseMetric := inverse_h hxy
+  rw [geomEta (geom x), geomEta (geom y), hm, hc, hr, hrc, hi]
 
 structure NumericalObservation where
   label : String
